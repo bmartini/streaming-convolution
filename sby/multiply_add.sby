@@ -1,0 +1,12 @@
+[options]
+mode prove
+
+[engines]
+smtbmc
+
+[script]
+read -formal multiply_add.sv
+prep -top multiply_add
+
+[files]
+../hdl/multiply_add.sv
