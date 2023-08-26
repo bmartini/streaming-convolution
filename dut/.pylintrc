@@ -1,0 +1,6 @@
+[BASIC]
+good-names-rgxs=^[_a-z][_a-z0-9]?$
+good-names=PIPELINE
+
+[DESIGN]
+max-line-length=120
