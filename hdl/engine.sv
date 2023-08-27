@@ -32,7 +32,6 @@ module engine
     genvar s;
     genvar i;
 
-    logic   [WORD_WIDTH*2-1:0]  image_wrap [KERNEL_HEIGHT];
     logic   [KERNEL_NB*2-1:0]   token_wrap;
     logic   [KERNEL_NB-1:0]     token;
 
@@ -59,14 +58,18 @@ module engine
     generate
         for (h=0; h<KERNEL_HEIGHT; h=h+1) begin : HEIGHT_
 
-            always_comb begin
-                image_wrap[h] = {image[h*WORD_WIDTH +: WORD_WIDTH], image[h*WORD_WIDTH +: WORD_WIDTH]};
-            end
 
             for (s=0; s<IMAGE_NB; s=s+1) begin: SLICE_
 
                 localparam BOUNDARY = IMAGE_NB-KERNEL_WIDTH;
                 localparam OFFSET   = (s <= BOUNDARY) ? 0 : s-BOUNDARY;
+
+                logic   [WORD_WIDTH*2-1:0]  image_wrap;
+
+                always_comb begin
+                    image_wrap = {image[h*WORD_WIDTH +: WORD_WIDTH], image[h*WORD_WIDTH +: WORD_WIDTH]};
+                end
+
 
                 slice #(
                     .MAC_NB         (KERNEL_WIDTH),
@@ -78,9 +81,9 @@ module engine
                     .rst    (rst),
 
                     .weight         (weight),
-                    .weight_valid   (token[h*KERNEL_WIDTH +: KERNEL_WIDTH]),
+                    .weight_valid   ({KERNEL_WIDTH{weight_valid}} & token[h*KERNEL_WIDTH +: KERNEL_WIDTH]),
 
-                    .image          (image_wrap[h][s*IMAGE_WIDTH +: IMAGE_WIDTH*KERNEL_WIDTH]),
+                    .image          (image_wrap[(s+1)*IMAGE_WIDTH+WORD_WIDTH-1 -: WORD_WIDTH]),
                     .image_valid    (image_valid),
 
                     .result         (slice_result[h][s*RESULT_WIDTH +: RESULT_WIDTH]),
