@@ -1,5 +1,5 @@
 """
-Testbench for slice module.
+Testbench for slice module with offset parameter set to 2.
 """
 
 import shutil
@@ -21,7 +21,7 @@ class Param(IntEnum):
     IMAGE_WIDTH: Bus width of image numbers
     """
     MAC_NB = 3
-    OFFSET = 0
+    OFFSET = 2
     WEIGHT_WIDTH = 8
     IMAGE_WIDTH = 16
 
@@ -96,7 +96,22 @@ class Checker:
     def __init__(self) -> None:
         self._reset: bool = False
         self._weight: List[int] = [0]*Param.MAC_NB
+        self._partial: int = 0
         self._result: int = 0
+
+    def _slice(self, image: List[int]) -> None:
+        """Modeling the slice modules logic."""
+        result = self._partial
+        partial = 0
+
+        for x in range(Param.MAC_NB):
+            if (Param.OFFSET == 0) or (x < Param.OFFSET):
+                result = _mac_addition(result, _mac_multiply(image[x], self._weight[x]))
+            else:
+                partial = _mac_addition(partial, _mac_multiply(image[x], self._weight[x]))
+
+        self._result = result
+        self._partial = partial
 
     def reset(self, state: bool) -> None:
         """Prep 'reset' module and model."""
@@ -122,16 +137,14 @@ class Checker:
         """Prep stream values for the image bus."""
         assert len(image) == Param.MAC_NB, f"Incorrect number of pixels, given: {len(image)}, expected: {Param.MAC_NB}"
 
-        bus = 0
+        image_bus = 0
         for x, i in enumerate(image):
-            bus = bus | (i << (x*Param.IMAGE_WIDTH))
+            image_bus = image_bus | (i << (x*Param.IMAGE_WIDTH))
 
-        vpw.prep("image", vpw.pack(Param.IMAGE_WIDTH*Param.MAC_NB, bus))
+        vpw.prep("image", vpw.pack(Param.IMAGE_WIDTH*Param.MAC_NB, image_bus))
         vpw.prep("image_valid", [1])
 
-        self._result = 0
-        for x in range(Param.MAC_NB):
-            self._result = _mac_addition(self._result, _mac_multiply(image[x], self._weight[x]))
+        self._slice(image)
 
     def init(self, _) -> Generator:
         """Background initilization function."""
@@ -148,11 +161,9 @@ class Checker:
 
             result_1m = result
             result = result_p[0]
-            for x in range(1, len(result_p)):
-                result_p[x-1] = result_p[x]
-            result_p[-1] = self._result
-
+            result_p = result_p[1::]+[self._result]
             self._result = 0
+
             vpw.prep("image", vpw.pack(Param.IMAGE_WIDTH*Param.MAC_NB, 0))
             vpw.prep("image_valid", [0])
 
@@ -160,6 +171,8 @@ class Checker:
                 result_1m = 0
                 result = 0
                 result_p = [0]*PIPELINE
+                self._weight = [0]*Param.MAC_NB
+                self._partial = 0
 
 
 @pytest.fixture(name="_design", scope="module")
