@@ -96,8 +96,8 @@ class Checker:
     def __init__(self) -> None:
         self._reset: bool = False
         self._weight: List[int] = [0]*Param.MAC_NB
-        self._partial: int = 0
         self._result: int = 0
+        self._partial: int = 0
 
     def _slice(self, image: List[int]) -> None:
         """Modeling the slice modules logic."""
@@ -105,7 +105,7 @@ class Checker:
         partial = 0
 
         for x in range(Param.MAC_NB):
-            if (Param.OFFSET == 0) or (x < Param.OFFSET):
+            if (Param.OFFSET == (Param.MAC_NB-1)) or ((Param.MAC_NB-1-Param.OFFSET) <= x):
                 result = _mac_addition(result, _mac_multiply(image[x], self._weight[x]))
             else:
                 partial = _mac_addition(partial, _mac_multiply(image[x], self._weight[x]))
@@ -136,6 +136,9 @@ class Checker:
     def prep_image(self, image: List[int]) -> None:
         """Prep stream values for the image bus."""
         assert len(image) == Param.MAC_NB, f"Incorrect number of pixels, given: {len(image)}, expected: {Param.MAC_NB}"
+
+        image = image*2
+        image = image[Param.OFFSET+1:Param.OFFSET+Param.MAC_NB+1:]
 
         image_bus = 0
         for x, i in enumerate(image):
@@ -219,7 +222,7 @@ def test_stream_contiguous_2_beats(_context):
     vpw.register(checker)
 
     # send weights to module
-    weight = [2]*Param.MAC_NB
+    weight = [1]*Param.MAC_NB
     checker.send_weight(weight)
     vpw.idle(4)
 
@@ -241,7 +244,7 @@ def test_stream_intermittent_2_beats(_context):
     vpw.register(checker)
 
     # send weights to module
-    weight = [2]*Param.MAC_NB
+    weight = [1]*Param.MAC_NB
     checker.send_weight(weight)
 
     # prep image

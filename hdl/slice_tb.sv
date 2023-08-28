@@ -64,21 +64,25 @@ module slice_tb;
             $signed(image[1*IMAGE_WIDTH +: IMAGE_WIDTH]),
             $signed(image[2*IMAGE_WIDTH +: IMAGE_WIDTH]),
 
-            "\tval: %b, image: %d %d %d",
-            image_valid,
-            $signed(uut.image_offset[0*IMAGE_WIDTH +: IMAGE_WIDTH]),
-            $signed(uut.image_offset[1*IMAGE_WIDTH +: IMAGE_WIDTH]),
-            $signed(uut.image_offset[2*IMAGE_WIDTH +: IMAGE_WIDTH]),
+            //"\tdelay: %x, %x, %x",
+            //uut.MAC_[0].delay[IMAGE_WIDTH*uut.MAC_[0].DELAY_NB-1 -: IMAGE_WIDTH],
+            //uut.MAC_[1].delay[IMAGE_WIDTH*uut.MAC_[1].DELAY_NB-1 -: IMAGE_WIDTH],
+            //uut.MAC_[2].delay[IMAGE_WIDTH*uut.MAC_[2].DELAY_NB-1 -: IMAGE_WIDTH],
 
-            "\tmac2: %d, %d",
-            $signed(uut.MAC_[1].delay[uut.PIPELINE*1-uut.MAC_[1].DELAY_OFFSET]),
-            $signed(uut.product_r[1]),
+            //"\tadd: %d, %d, %d",
+            //$signed(uut.product_r[0]),
+            //$signed(uut.product_r[1]),
+            //$signed(uut.product_r[2]),
 
-            "\tmac3: %d, %d",
-            $signed(uut.MAC_[2].delay[uut.PIPELINE*2-uut.MAC_[2].DELAY_OFFSET]),
-            $signed(uut.product_r[2]),
+            "\tproductA: %b, %d",
+            uut.MAC_[0].product_valid,
+            $signed(uut.MAC_[0].product),
 
-            "\tproduct3: %b, %d",
+            "\tproductB: %b, %d",
+            uut.MAC_[1].product_valid,
+            $signed(uut.MAC_[1].product),
+
+            "\tproductC: %b, %d",
             uut.MAC_[2].product_valid,
             $signed(uut.MAC_[2].product),
 
@@ -107,41 +111,41 @@ module slice_tb;
         repeat(6) @(negedge clk);
 
         $display("send weightnel stream");
-        weight          <= WEIGHT_WIDTH'(2);
+        weight          <= WEIGHT_WIDTH'(1);
         weight_valid    <= 3'b001;
         @(negedge clk);
 
-        weight          <= WEIGHT_WIDTH'(2);
+        weight          <= WEIGHT_WIDTH'(1);
         weight_valid    <= 3'b010;
         @(negedge clk);
 
-        weight          <= WEIGHT_WIDTH'(2);
+        weight          <= WEIGHT_WIDTH'(1);
         weight_valid    <= 3'b100;
         @(negedge clk);
 
         weight          <= WEIGHT_WIDTH'(0);
-        weight_valid    <= 1'b0;
+        weight_valid    <= 3'b000;
         @(negedge clk);
 
         $display("test continuous stream");
-        image[0*IMAGE_WIDTH +: IMAGE_WIDTH] <= IMAGE_WIDTH'(1);
-        image[1*IMAGE_WIDTH +: IMAGE_WIDTH] <= IMAGE_WIDTH'(2);
-        image[2*IMAGE_WIDTH +: IMAGE_WIDTH] <= IMAGE_WIDTH'(3);
+        image[0*IMAGE_WIDTH +: IMAGE_WIDTH] <= IMAGE_WIDTH'(2);
+        image[1*IMAGE_WIDTH +: IMAGE_WIDTH] <= IMAGE_WIDTH'(3);
+        image[2*IMAGE_WIDTH +: IMAGE_WIDTH] <= IMAGE_WIDTH'(1);
 
         image_valid <= 1'b1;
         @(negedge clk);
 
-        image[0*IMAGE_WIDTH +: IMAGE_WIDTH] <= IMAGE_WIDTH'(4);
-        image[1*IMAGE_WIDTH +: IMAGE_WIDTH] <= IMAGE_WIDTH'(5);
-        image[2*IMAGE_WIDTH +: IMAGE_WIDTH] <= IMAGE_WIDTH'(6);
+        image[0*IMAGE_WIDTH +: IMAGE_WIDTH] <= IMAGE_WIDTH'(5);
+        image[1*IMAGE_WIDTH +: IMAGE_WIDTH] <= IMAGE_WIDTH'(6);
+        image[2*IMAGE_WIDTH +: IMAGE_WIDTH] <= IMAGE_WIDTH'(4);
 
         image_valid <= 1'b1;
         @(negedge clk);
 
         $display("test not-continuous stream");
-        image[0*IMAGE_WIDTH +: IMAGE_WIDTH] <= IMAGE_WIDTH'(1);
-        image[1*IMAGE_WIDTH +: IMAGE_WIDTH] <= IMAGE_WIDTH'(2);
-        image[2*IMAGE_WIDTH +: IMAGE_WIDTH] <= IMAGE_WIDTH'(3);
+        image[0*IMAGE_WIDTH +: IMAGE_WIDTH] <= IMAGE_WIDTH'(2);
+        image[1*IMAGE_WIDTH +: IMAGE_WIDTH] <= IMAGE_WIDTH'(3);
+        image[2*IMAGE_WIDTH +: IMAGE_WIDTH] <= IMAGE_WIDTH'(1);
 
         image_valid <= 1'b1;
         @(negedge clk);
@@ -150,9 +154,9 @@ module slice_tb;
         image_valid <= 1'b0;
         repeat (20) @(negedge clk);
 
-        image[0*IMAGE_WIDTH +: IMAGE_WIDTH] <= IMAGE_WIDTH'(4);
-        image[1*IMAGE_WIDTH +: IMAGE_WIDTH] <= IMAGE_WIDTH'(5);
-        image[2*IMAGE_WIDTH +: IMAGE_WIDTH] <= IMAGE_WIDTH'(6);
+        image[0*IMAGE_WIDTH +: IMAGE_WIDTH] <= IMAGE_WIDTH'(5);
+        image[1*IMAGE_WIDTH +: IMAGE_WIDTH] <= IMAGE_WIDTH'(6);
+        image[2*IMAGE_WIDTH +: IMAGE_WIDTH] <= IMAGE_WIDTH'(4);
 
         image_valid <= 1'b1;
         @(negedge clk);
@@ -163,7 +167,7 @@ module slice_tb;
 
 
         repeat(10) @(negedge clk);
-        $display("slice done");
+        $display("slice offset: %2d", OFFSET);
 
         $finish;
     end
