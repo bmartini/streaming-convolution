@@ -108,10 +108,39 @@ def _group_add(args: List[int]) -> int:
     return sum(args) & mask
 
 
+def _rescale(number: int, shift: int) -> int:
+    """Bounded rescale a fixed point number."""
+    num_mask = (1 << RESULT_WIDTH) - 1
+    negative = 1 << (RESULT_WIDTH - 1)
+    img_max = int((1 << (Param.IMAGE_WIDTH - 1)) - 1)
+    img_min = int((img_max + 1) * -1)
+
+    # converts to twos complement of defined width
+    number = _twos(RESULT_WIDTH, number)
+
+    # convert number back into negative when down stream should be negative
+    if (number & negative) != 0 and RESULT_WIDTH >= (Param.IMAGE_WIDTH + shift):
+        number = int((num_mask - number + 1) * -1)
+
+    # raw value of shifted number
+    scaled = _twos(Param.IMAGE_WIDTH, (number >> shift))
+
+    if int(number >> shift) > img_max:
+        # shifted number greater than image max
+        scaled = _twos(Param.IMAGE_WIDTH, img_max)
+
+    if int(number >> shift) < img_min:
+        # shifted number less than image min
+        scaled = _twos(Param.IMAGE_WIDTH, img_min)
+
+    return scaled
+
+
 class Checker:
     """Model of Hardware Module"""
     def __init__(self) -> None:
         self._reset: bool = False
+        self._shift: int = 0
         self._weight: List[int] = [0]*KERNEL_NB
         self._result: int = 0
 
@@ -143,6 +172,20 @@ class Checker:
         """Prep 'reset' module and model."""
         vpw.prep("rst", [int(state)])
         self._reset = state
+
+    def send_shift(self, shift: int) -> None:
+        """Blocking function that sends the configuration value for the rescale module."""
+        mask = (1 << 7) - 1
+        self._shift = shift & mask
+        assert self._shift == shift, "shift value too large for the configuration bus."
+
+        vpw.prep("cfg_shift", [shift])
+        vpw.prep("cfg_valid", [1])
+        vpw.tick()
+
+        vpw.prep("cfg_shift", [0])
+        vpw.prep("cfg_valid", [0])
+        vpw.tick()
 
     def send_weight(self, weight: List[int]) -> None:
         """Blocking function that sends a list of weights to module."""
@@ -176,11 +219,11 @@ class Checker:
 
         self._result = 0
         for x, column in enumerate(self._slice_result):
-            self._result = self._result | (_group_add(column) << (x*RESULT_WIDTH))
+            self._result = self._result | (_rescale(_group_add(column), self._shift) << (x*Param.IMAGE_WIDTH))
 
     def init(self, _) -> Generator:
         """Background initilization function."""
-        PIPELINE: Final = 24
+        PIPELINE: Final = 28
 
         result_1m = 0
         result = 0
@@ -189,7 +232,7 @@ class Checker:
 
         while True:
             io = yield
-            hw_result = vpw.unpack(RESULT_WIDTH*Param.IMAGE_NB, io["result"])
+            hw_result = vpw.unpack(WORD_WIDTH, io["result"])
             assert hw_result == result, f"{result_1m:x}, {hw_result:x} != {result:x}, {result_p}"
 
             result_1m = result
@@ -231,8 +274,7 @@ def design():
 @pytest.fixture(name="_context")
 def context(_design):
     """Setup and tear-down the design for each test."""
-    #vpw.init(_design, trace=False)
-    vpw.init(_design, trace=True)
+    vpw.init(_design, trace=False)
 
     vpw.prep("rst", [1])
     vpw.prep("weight", vpw.pack(Param.WEIGHT_WIDTH, 0))

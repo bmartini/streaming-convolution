@@ -26,13 +26,16 @@ module engine_tb;
 
     logic   rst;
 
+    logic   [7:0]   cfg_shift;
+    logic           cfg_valid;
+
     logic   [WEIGHT_WIDTH-1:0]  weight;
     logic                       weight_valid;
 
-    logic   [KERNEL_HEIGHT*WORD_WIDTH-1:0]  image;
+    logic   [WORD_WIDTH*KERNEL_HEIGHT-1:0]  image;
     logic                                   image_valid;
 
-    logic   [RESULT_WIDTH*IMAGE_NB-1:0] result;
+    logic   [WORD_WIDTH-1:0] result;
 
     engine #(
         .WEIGHT_WIDTH   (WEIGHT_WIDTH),
@@ -44,13 +47,16 @@ module engine_tb;
         .clk    (clk),
         .rst    (rst),
 
+        .cfg_shift  (cfg_shift),
+        .cfg_valid  (cfg_valid),
+
         .weight         (weight),
         .weight_valid   (weight_valid),
 
         .image          (image),
         .image_valid    (image_valid),
 
-        .result         (result)
+        .result (result)
     );
 
     always @(posedge clk) begin
@@ -69,7 +75,7 @@ module engine_tb;
             $signed(image[2*IMAGE_WIDTH +: IMAGE_WIDTH]),
 
             "\tresult: %x",
-            $signed(result),
+            result,
 
             "\t%b",
             uut.token,
@@ -79,6 +85,9 @@ module engine_tb;
     initial begin
         // init values
         rst = 0;
+
+        cfg_shift   = WEIGHT_WIDTH'(0);
+        cfg_valid   = 1'b0;
 
         weight          = WEIGHT_WIDTH'(0);
         weight_valid    = 1'b0;

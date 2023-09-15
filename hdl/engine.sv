@@ -3,6 +3,7 @@
 
 `include "slice.sv"
 `include "group_add.sv"
+`include "rescale.sv"
 
 `default_nettype none
 
@@ -12,32 +13,47 @@ module engine
     parameter   IMAGE_NB        = 8,
     parameter   KERNEL_WIDTH    = 3,
     parameter   KERNEL_HEIGHT   = 3,
-    localparam  WORD_WIDTH      = IMAGE_WIDTH*IMAGE_NB,
-    localparam  RESULT_WIDTH    = IMAGE_WIDTH+WEIGHT_WIDTH+1)
+    localparam  WORD_WIDTH      = IMAGE_WIDTH*IMAGE_NB)
    (input   wire    clk,
     input   wire    rst,
+
+    input   wire    [7:0]   cfg_shift,
+    input   wire            cfg_valid,
 
     input   wire    [WEIGHT_WIDTH-1:0]  weight,
     input   wire                        weight_valid,
 
-    input   wire    [KERNEL_HEIGHT*WORD_WIDTH-1:0]  image,
+    input   wire    [WORD_WIDTH*KERNEL_HEIGHT-1:0]  image,
     input   wire                                    image_valid,
 
-    output  logic   [RESULT_WIDTH*IMAGE_NB-1:0] result
+    output  logic   [WORD_WIDTH-1:0] result
 );
 
-    localparam KERNEL_NB = KERNEL_WIDTH*KERNEL_HEIGHT;
+    localparam KERNEL_NB    = KERNEL_WIDTH*KERNEL_HEIGHT;
+    localparam SLICE_WIDTH  = IMAGE_WIDTH+WEIGHT_WIDTH+1;
 
     genvar h;
     genvar s;
     genvar i;
 
+    logic   [7:0]   shift;
+
     logic   [KERNEL_NB*2-1:0]   token_wrap;
     logic   [KERNEL_NB-1:0]     token;
 
-    logic   [RESULT_WIDTH*KERNEL_HEIGHT-1:0]    slice_reorder   [IMAGE_NB];
-    logic   [RESULT_WIDTH*IMAGE_NB-1:0]         slice_result    [KERNEL_HEIGHT];
-    logic   [IMAGE_NB-1:0]                      slice_done      [KERNEL_HEIGHT];
+    logic   [SLICE_WIDTH*KERNEL_HEIGHT-1:0] slice_reorder   [IMAGE_NB];
+    logic   [SLICE_WIDTH*IMAGE_NB-1:0]      slice_result    [KERNEL_HEIGHT];
+    logic   [IMAGE_NB-1:0]                  slice_done      [KERNEL_HEIGHT];
+
+
+    always_ff @(posedge clk) begin
+        if (rst) begin
+            shift <= 0;
+        end
+        else if (cfg_valid) begin
+            shift <= cfg_shift;
+        end
+    end
 
 
     always_comb begin
@@ -86,12 +102,12 @@ module engine
                     .image          (image_wrap[(s+1)*IMAGE_WIDTH+WORD_WIDTH-1 -: WORD_WIDTH]),
                     .image_valid    (image_valid),
 
-                    .result         (slice_result[h][s*RESULT_WIDTH +: RESULT_WIDTH]),
+                    .result         (slice_result[h][s*SLICE_WIDTH +: SLICE_WIDTH]),
                     .result_valid   (slice_done[h][s])
                 );
 
                 always_comb begin
-                    slice_reorder[s][h*RESULT_WIDTH +: RESULT_WIDTH] = slice_result[h][s*RESULT_WIDTH +: RESULT_WIDTH];
+                    slice_reorder[s][h*SLICE_WIDTH +: SLICE_WIDTH] = slice_result[h][s*SLICE_WIDTH +: SLICE_WIDTH];
                 end
             end
         end
@@ -101,14 +117,27 @@ module engine
     generate
         for (i=0; i<IMAGE_NB; i=i+1) begin: ADDERS_
 
+            logic [SLICE_WIDTH-1:0] group_data;
+
             group_add #(
                 .GROUP_NB   (KERNEL_HEIGHT),
-                .NUM_WIDTH  (RESULT_WIDTH))
+                .NUM_WIDTH  (SLICE_WIDTH))
             group_add_ (
-                .clk        (clk),
+                .clk    (clk),
 
                 .up_data    (slice_reorder[i]),
-                .dn_data    (result[i*RESULT_WIDTH +: RESULT_WIDTH])
+                .dn_data    (group_data)
+            );
+
+            rescale #(
+                .NUM_WIDTH  (SLICE_WIDTH),
+                .IMG_WIDTH  (IMAGE_WIDTH))
+            rescale_ (
+                .clk    (clk),
+                .shift  (shift),
+
+                .up_data    (group_data),
+                .dn_data    (result[i*IMAGE_WIDTH +: IMAGE_WIDTH])
             );
         end
     endgenerate
